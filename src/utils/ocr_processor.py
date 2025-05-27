@@ -3,10 +3,12 @@ from PIL import Image
 import logging
 from typing import Dict, Optional, List, Tuple
 import re
+from ..agents.learning_manager import LearningManager
 
 class OCRProcessor:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        self.learning_manager = LearningManager()
 
     def extract_text(self, image_path: str) -> Dict:
         """
@@ -109,30 +111,30 @@ class OCRProcessor:
             """Check if text is common header/boilerplate text"""
             return any(header.lower() in text.lower() for header in HEADER_TEXTS)
         
-        def find_in_lines(patterns: List[str], preprocess_func=None, min_word_confidence=0, exclude_headers=True, max_words=None) -> Dict[str, float]:
+        def find_in_lines(patterns: List[str], preprocess_func=None, min_word_confidence=0, exclude_headers=True, max_words=None, field_name=None) -> Dict[str, float]:
             """Find text matching any of the given patterns with confidence threshold"""
             best_match = {"value": "", "confidence": 0.0}
-            
-            for line_words in lines.values():
-                # Filter out low confidence words if threshold is set
-                if min_word_confidence > 0:
-                    line_words = [w for w in line_words if w["confidence"] >= min_word_confidence]
-                
-                if not line_words:
-                    continue
-                
-                # If max_words is set, skip lines that are too long (likely addresses or headers)
-                if max_words and len(line_words) > max_words:
-                    continue
+            best_pattern = None
+            for pattern in patterns:
+                for line_words in lines.values():
+                    # Filter out low confidence words if threshold is set
+                    if min_word_confidence > 0:
+                        line_words = [w for w in line_words if w["confidence"] >= min_word_confidence]
                     
-                line_text = " ".join(w["text"] for w in line_words)
-                if exclude_headers and is_header_text(line_text):
-                    continue
+                    if not line_words:
+                        continue
                     
-                if preprocess_func:
-                    line_text = preprocess_func(line_text)
-                
-                for pattern in patterns:
+                    # If max_words is set, skip lines that are too long (likely addresses or headers)
+                    if max_words and len(line_words) > max_words:
+                        continue
+                        
+                    line_text = " ".join(w["text"] for w in line_words)
+                    if exclude_headers and is_header_text(line_text):
+                        continue
+                        
+                    if preprocess_func:
+                        line_text = preprocess_func(line_text)
+                    
                     matches = re.search(pattern, line_text, re.IGNORECASE)
                     if matches:
                         matched_text = matches.group(1) if len(matches.groups()) > 0 else matches.group(0)
@@ -153,16 +155,15 @@ class OCRProcessor:
                                 matched_text in word["text"] or 
                                 any(part in matched_text for part in word["text"].split())):
                                 matched_words.append(word)
-                        
                         if matched_words:
                             confidence = sum(w["confidence"] for w in matched_words) / len(matched_words)
                             # Update best match if confidence is higher
                             if confidence > best_match["confidence"]:
-                                best_match = {
-                                    "value": matched_text,
-                                    "confidence": confidence
-                                }
-            
+                                best_match = {"value": matched_text, "confidence": confidence}
+                                best_pattern = pattern
+            # Record the successful pattern if found
+            if field_name and best_match["value"] and best_pattern:
+                self.learning_manager.record_success(field_name, best_pattern)
             return best_match
         
         # License number patterns
@@ -171,7 +172,7 @@ class OCRProcessor:
             r'(?:MH|KA|DL)\d{2}\s*\d{8,12}',
             r'(?:MH|KA|DL)\d{2}\s*\d{4,8}[A-Z]?',  # Format for some Indian licenses
         ]
-        fields["license_number"] = find_in_lines(license_patterns)
+        fields["license_number"] = find_in_lines(license_patterns, field_name="license_number")
         
         # Enhanced name detection for driver's licenses
         def clean_name(text):
@@ -210,7 +211,8 @@ class OCRProcessor:
             preprocess_func=clean_name,
             min_word_confidence=75.0,  # Slightly lower threshold to catch more candidates
             max_words=4,  # Names typically won't be more than 4 words
-            exclude_headers=True
+            exclude_headers=True,
+            field_name="name"
         )
 
         # Post-process name to ensure proper capitalization
@@ -227,7 +229,7 @@ class OCRProcessor:
             r'Valid\s+Until[.:\s;]*(\d{2}[-/]\d{2}[-/]\d{4})',
             r'Expiry[.:\s;]*(\d{2}[-/]\d{2}[-/]\d{4})',
         ]
-        fields["expiry_date"] = find_in_lines(date_patterns)
+        fields["expiry_date"] = find_in_lines(date_patterns, field_name="expiry_date")
         
         # License class patterns
         def clean_class(text):
@@ -244,7 +246,7 @@ class OCRProcessor:
         ]
         
         # Get all potential classes
-        class_result = find_in_lines(class_patterns, clean_class, min_word_confidence=70.0, exclude_headers=False)
+        class_result = find_in_lines(class_patterns, clean_class, min_word_confidence=70.0, exclude_headers=False, field_name="license_class")
         
         # Clean up the class result
         if class_result["value"]:

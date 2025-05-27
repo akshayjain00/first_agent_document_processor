@@ -1,0 +1,15 @@
+{
+  "license_number": {
+    "(?:MH|KA|DL)\\d{2}\\s*\\d{4,8}[A-Z]?": 4,
+    "(?:DL|License)\\s*(?:No\\.?|Number:?)[:\\s-]*([A-Z0-9\\s-]+)(?:\\s+DO[!}])?": 8
+  },
+  "name": {
+    "\\b([A-Z]+\\s+[A-Z]+(?:\\s+[A-Z]+)?)\\b(?:\\s*(?:S/O|D/O|W/O|of))?": 12
+  },
+  "expiry_date": {
+    "Valid\\s+Till[.:\\s;]*(\\d{2}[-/]\\d{2}[-/]\\d{4})": 12
+  },
+  "license_class": {
+    "\\b(?:MCWG|LMV|MC|TRANS)\\b": 12
+  }
+}
