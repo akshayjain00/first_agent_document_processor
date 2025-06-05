@@ -1,11 +1,12 @@
 from typing import Dict, List
 import logging
-from .license_verifier import LicenseVerifier
+from .swarm_manager import SwarmOrchestrator
 
 class DocumentManagerAgent:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        self.license_verifier = LicenseVerifier()
+        # Use the swarm orchestrator to manage all agent interactions
+        self.orchestrator = SwarmOrchestrator()
     
     def process_document(self, document_path: str, document_type: str) -> Dict:
         """
@@ -23,8 +24,8 @@ class DocumentManagerAgent:
             if document_type.lower() != "driver_license":
                 return {"status": "rejected", "reason": "Currently only processing driver's licenses"}
                 
-            # Delegate to license verification agent
-            verification_result = self.license_verifier.verify_license(document_path)
+            # Delegate to license verification agent through the orchestrator
+            verification_result = self.orchestrator.run_license_verifier(document_path)
             
             # Log the verification attempt
             self.logger.info(f"Processed document {document_path} with result: {verification_result}")
