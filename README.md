@@ -33,6 +33,12 @@ A Python-based system for automated processing and verification of driver docume
    pip install -r requirements.txt
    ```
 
+4. Configure the OpenAI API key for the optional swarm orchestrator:
+   ```bash
+   export OPENAI_API_KEY="your-openai-key"
+   ```
+   The key can also be placed in a `.env` file based on `example.env`.
+
 ## Project Structure
 - `src/agents/`: Contains the agent implementations
   - `document_manager.py`: Main document processing coordinator
