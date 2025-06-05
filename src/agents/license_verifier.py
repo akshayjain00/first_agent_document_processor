@@ -23,12 +23,20 @@ class LicenseVerifier:
         """
         # Extract text from license
         ocr_result = self.ocr.extract_text(document_path)
-        
+
         if ocr_result["status"] != "success":
             return {
                 "status": "rejected",
                 "reason": "Failed to extract text from document",
                 "error": ocr_result.get("error")
+            }
+
+        # Basic confidence check on the overall OCR result
+        if ocr_result.get("confidence", 0) < self.requirements["min_confidence"]:
+            return {
+                "status": "rejected",
+                "reason": "Low overall OCR confidence",
+                "needs_better_image": True,
             }
 
         # Get field-specific results
@@ -43,9 +51,11 @@ class LicenseVerifier:
         for field in self.requirements["required_fields"]:
             if field not in field_results or not field_results[field]["value"]:
                 failed_fields.append(field)
-            elif field_results[field]["confidence"] < self.requirements["field_confidence_thresholds"][field]:
-                low_confidence_fields.append(f"{field} ({field_results[field]['confidence']:.1f}%)")
-            
+                continue
+            if field_results[field]["confidence"] < self.requirements["field_confidence_thresholds"][field]:
+                low_confidence_fields.append(
+                    f"{field} ({field_results[field]['confidence']:.1f}%)"
+                )
             extracted_info[field] = field_results[field]["value"]
 
         # Add license class if found
