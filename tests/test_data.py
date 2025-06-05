@@ -1,3 +1,18 @@
+import sys
+import types
+
+if 'PIL' not in sys.modules:
+    pil = types.ModuleType('PIL')
+    class Image:
+        def __init__(self, *args, **kwargs):
+            pass
+        def save(self, *a, **k):
+            pass
+    pil.Image = Image
+    pil.ImageDraw = types.SimpleNamespace(Draw=lambda *a, **k: types.SimpleNamespace(text=lambda *args, **kwargs: None))
+    pil.ImageFont = types.SimpleNamespace()
+    sys.modules['PIL'] = pil
+
 from PIL import Image, ImageDraw, ImageFont
 import os
 from datetime import datetime, timedelta
